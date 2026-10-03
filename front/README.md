@@ -1,56 +1,50 @@
-# Welcome to your Expo app 👋
+## Comandos
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+1. Instalar dependências - `npm install`
 
-## Get started
+2. Iniciar o app - `npx expo start`
 
-1. Install dependencies
+3. Resetar o 'placeholder' do projeto inicial - `npm run reset-project`
 
-   ```bash
-   npm install
-   ```
+Para mais comandos, confira o arquivo `package.json`
 
-2. Start the app
+## Links importantes
 
-   ```bash
-   npx expo start
-   ```
+- https://expo.dev/ (Infra para build pelo CLI, CI/CD pra mobile, deploy e monitoramento de produção )
+- (https://docs.expo.dev/develop/unit-testing/)
 
-In the output, you'll find options to open the app in a
+## Observações/Tarefas a fazer
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- versão do expo
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+a versão do expo hoje no projeto é ("expo": "~57.0.26") porem para testes no expo go pelo celular foi necessário realizar um downgrade para a versão ("expo": "54.0.0"), o que impactou diretamente nas versões de várias outras dependências, que tiveram que mudar também. 
 
-## Get a fresh project
+preferível ajustar essa questão o mais cedo possível para que seja viável os testes pelo app `Expo GO` no celular.
 
-When you're ready, run:
+- garantia de qualidade (https://docs.expo.dev/guides/using-eslint/)
+   - do código com eslint 
+   - de estilo do código com prettier
 
-```bash
-npm run reset-project
-```
+embora o estilo possa ser algo ignorado, a qualidade é um ponto importante a ser investido em sistemas que vão para produção. mas como a documentação oferece também um manual de configuração pra isso, seria interessante realizar os dois.
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+- lock de versões
 
-### Other setup steps
+para nos protegermos de possíveis vulnerabilidades, é importante travar a versão dos pacotes que usamos ao longo do projeto. para isso não basta só eliminar o `~` ou `^`, é necessário investir um tempo pesquisando as libs e vendo se há ou não alguma vulnerabilidade crítica para dada versão.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+é possível apenas realizar esse ajuste nas dependências que vão a produção, então as `devDependencies` podem ser ignoradas desse ajuste.
 
-## Learn more
+recomendo demais não usar IA para esse ponto, visto que a mesma tem suas limitações para informações mais recentes.
 
-To learn more about developing your project with Expo, look at the following resources:
+- separação de ambiente de homologação e produção (variaveis de ambiente)
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- definição de arquivo para injetar a URL das chamadas a API segundo o ambiente (dev ou não dev)
 
-## Join the community
+- env.example
 
-Join our community of developers creating universal apps.
+- manual para
+    - instalar, configurar
+    - rodar localmente
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- testes automatizados (um bonus, não tão necessário)
+
+seria interessante estar utilizando testes automatizados para garantir que não esta tendo regressão sem precisar testar todas as telas do sistema.
