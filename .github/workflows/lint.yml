@@ -1,0 +1,35 @@
+name: Code Lint (Ruff)
+
+on:
+  push:
+    paths:
+      - "api/**"
+  pull_request:
+    paths:
+      - "api/**"
+
+jobs:
+  lint:
+    name: Ruff Code Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "poetry"
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Ruff check (lint)
+        run: poetry run ruff check .
