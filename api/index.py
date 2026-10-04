@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -11,9 +12,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.main import app as src_app
 
+ENVIRONMENT = os.getenv("VERCEL_ENV", "dev")
+
 app = FastAPI(
-    title="SGPC API",
-    description="Backend do Sistema de Gerenciamento de Portaria e Controle de Acesso",
+    title="SGAA API",
+    description="Backend do Sistema de Gerenciamento de Alunos e Aulas",
     version="0.1.0",
 )
 
@@ -28,7 +31,7 @@ app.add_middleware(
 
 @app.get("/api/health", tags=["Health"])
 def health_check():
-    return {"status": "ok"}
+    return {"status": "ok", "environment": ENVIRONMENT}
 
 
 app.mount("/", src_app)
