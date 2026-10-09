@@ -162,9 +162,7 @@ def test_token_de_acesso_nao_serve_no_primeiro_acesso(client, criar_usuario, alu
     assert sem_token.status_code == 401
 
 
-def test_primeiro_acesso_so_pode_ser_concluido_uma_vez(
-    client, criar_usuario, enviador
-):
+def test_primeiro_acesso_so_pode_ser_concluido_uma_vez(client, criar_usuario, enviador):
     criar_usuario("novo@exemplo.com", senha=None)
     headers = _validar_codigo(client, enviador, "novo@exemplo.com")
     assert _concluir(client, headers).status_code == 200
