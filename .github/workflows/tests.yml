@@ -8,6 +8,9 @@ on:
     paths:
       - "api/**"
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Pytest
