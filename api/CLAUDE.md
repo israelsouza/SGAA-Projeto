@@ -18,10 +18,10 @@ Comandos executados dentro de `api/`.
 Os testes e as migrations precisam de um PostgreSQL acessível pela `DATABASE_URL`. Se não houver um disponível, subir um local com Docker:
 
 ```bash
-docker run -d --name sgaa-postgres -p 5432:5432 \
-  -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=sgaa_dev \
+docker run -d --name sgaa-test -p 5432:5432 \
+  -e POSTGRES_USER=user -e POSTGRES_PASSWORD=password -e POSTGRES_DB=sgaa_test \
   postgres:15
-export DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/sgaa_dev
+export DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/sgaa_test
 ```
 
 Se não for possível rodar os testes ou as migrations, dizer isso explicitamente no resumo da tarefa em vez de apresentá-la como verificada.
