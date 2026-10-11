@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.core.config import obter_config
+from src.core.observabilidade import configurar_observabilidade
 from src.main import app as src_app
 
 ENVIRONMENT = os.getenv("VERCEL_ENV", "dev")
@@ -32,5 +33,7 @@ app.add_middleware(
 def health_check():
     return {"status": "ok", "environment": ENVIRONMENT}
 
+
+configurar_observabilidade(src_app, app, ENVIRONMENT)
 
 app.mount("/", src_app)
