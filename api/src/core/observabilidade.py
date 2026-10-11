@@ -20,9 +20,11 @@ FLUSH_TIMEOUT_MS = 2000
 def _sem_valores(_: Any, atributos: dict[str, Any]) -> dict[str, Any]:
     # Os argumentos das rotas carregam CPF, telefone, e-mail e códigos, e cada
     # erro de validação traz o valor recebido em "input": nada disso é enviado.
+    # A mensagem também fica de fora, porque um validador pode citar nela o
+    # valor rejeitado (o de e-mail faz isso) e o Logfire não a limpa.
     return {
         "errors": [
-            {"type": erro.get("type"), "loc": erro.get("loc"), "msg": erro.get("msg")}
+            {"type": erro.get("type"), "loc": erro.get("loc")}
             for erro in atributos.get("errors", [])
         ]
     }

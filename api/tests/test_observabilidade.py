@@ -13,28 +13,22 @@ SENHA = "Senha-Que-Nao-Pode-Vazar#1"
 CODIGO = "codigo-que-nao-pode-vazar"
 
 
-def test_mapper_descarta_valores_e_input_dos_erros():
+def test_mapper_descarta_valores_input_e_mensagem_dos_erros():
     atributos = {
         "values": {"dados": {"cpf": CPF, "nova_senha": SENHA}},
         "errors": [
             {
                 "type": "value_error",
                 "loc": ("body", "cpf"),
-                "msg": "Value error, CPF inválido",
+                "msg": f"Value error, CPF inválido: {CPF}",
                 "input": CPF,
-                "ctx": {"error": "CPF inválido"},
+                "ctx": {"error": f"CPF inválido: {CPF}"},
             }
         ],
     }
-    assert _sem_valores(None, atributos) == {
-        "errors": [
-            {
-                "type": "value_error",
-                "loc": ("body", "cpf"),
-                "msg": "Value error, CPF inválido",
-            }
-        ]
-    }
+    resultado = _sem_valores(None, atributos)
+    assert resultado == {"errors": [{"type": "value_error", "loc": ("body", "cpf")}]}
+    assert CPF not in json.dumps(resultado)
 
 
 def test_mapper_sem_erros():

@@ -20,7 +20,7 @@ O `environment` vem da variável `VERCEL_ENV`, preenchida pela própria Vercel.
 
 - **Requisições**: método, rota, status, duração, IP e user agent do cliente.
 - **Consultas SQL**: o texto da consulta com os marcadores no lugar dos valores (`WHERE usuario.email = %(email_1)s`), e a duração.
-- **Erros de validação (`422`)**: campo, tipo e mensagem.
+- **Erros de validação (`422`)**: campo e tipo do erro. A mensagem não é enviada, porque pode citar o valor rejeitado.
 - **Exceções**: tipo, mensagem e stack trace.
 - **Logs do módulo `logging`** de nível `WARNING` para cima.
 
