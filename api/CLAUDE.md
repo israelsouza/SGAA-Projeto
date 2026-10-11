@@ -15,6 +15,7 @@ Comandos executados dentro de `api/`.
    - `poetry run pytest`
 2. Executar as migrations (`poetry run alembic upgrade head`) antes dos testes e sempre que criar ou alterar uma migração. Ao criar uma, validar também o caminho de volta (`poetry run alembic downgrade -1` e `upgrade head` de novo).
 3. Quando for pedido para organizar os commits, não executar `git commit`. Apenas colocar em staging os arquivos ou trechos de arquivos de cada grupo e sugerir no terminal a mensagem do commit (só o título, ou título com corpo). O commit é feito manualmente, depois de uma breve revisão do que foi separado.
+4. Antes de instalar qualquer dependência nova, parar e informar o nome exato do pacote, a versão e o motivo, e aguardar a confirmação. A conferência do nome e de CVEs para aquela versão é feita manualmente. Vale também para extras, plugins e dependências de desenvolvimento; nada de `poetry add` ou `pip install` de pacote novo sem esse aval.
 
 Se o `poetry` não estiver disponível no ambiente (por exemplo, dentro do ai-jail), criar um venv em `api/.venv` (já ignorado pelo git), instalar o `poetry` nele e usar os comandos normalmente:
 

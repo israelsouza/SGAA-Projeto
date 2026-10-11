@@ -25,6 +25,9 @@ class Config(BaseSettings):
     smtp_user: str = ""
     smtp_password: SecretStr = SecretStr("")
 
+    # Token de escrita do Logfire. Sem ele, a observabilidade fica desligada.
+    logfire_token: SecretStr | None = None
+
     # Origens separadas por vírgula. O app mobile não depende de CORS.
     cors_origins: str = "http://localhost:8081"
 

@@ -34,6 +34,7 @@ Banco: revisão `0002` do Alembic.
 - Envio de e-mail com backend `console` (apenas loga) ou `smtp`.
 - Script de criação da conta da professora: `python -m src.scripts.criar_professor`.
 - Script `aplicar_migracoes.sh`, para aplicar as migrações em produção ou homologação.
+- Observabilidade com o Logfire, ligada pela variável `LOGFIRE_TOKEN`: requisições, consultas SQL, exceções e logs, sem enviar os dados recebidos nas rotas.
 - Testes automatizados de autenticação, primeiro acesso, usuários e schemas.
 - Documentação: guia de migrações com Alembic, variáveis de ambiente e comandos úteis.
 

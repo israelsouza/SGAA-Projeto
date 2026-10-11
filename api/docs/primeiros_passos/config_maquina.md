@@ -87,6 +87,9 @@ CORS_ORIGINS=http://localhost:8081
 
 # "console" apenas loga os e-mails; "smtp" envia de verdade (ver .env.example)
 EMAIL_BACKEND=console
+
+# Opcional: token do Logfire. Sem ele nada é enviado (ver docs/observabilidade.md)
+# LOGFIRE_TOKEN=
 ```
 
 > **Nota:** A API não inicia se `DATABASE_URL` ou `SECRET_KEY` estiverem ausentes ou se a `SECRET_KEY` tiver menos de 32 caracteres.

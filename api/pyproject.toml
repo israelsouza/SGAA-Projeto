@@ -18,6 +18,7 @@ argon2-cffi = "25.1.0"
 pydantic-settings = "2.15.0"
 email-validator = "2.3.0"
 pydantic = "2.13.5"
+logfire = {extras = ["fastapi", "psycopg"], version = "5.1.1"}
 
 
 [build-system]
