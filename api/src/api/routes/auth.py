@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
 
 from src.api.deps import (
+    AlunoAtual,
     EnviadorEmailDep,
     SessaoDep,
     UsuarioAtual,
@@ -12,8 +13,14 @@ from src.core.security import (
     criar_token_primeiro_acesso,
     segundos_validade_token,
 )
+from src.models.aluno import Aluno
 from src.models.usuario import TipoUsuario, Usuario
-from src.schemas.aluno import PrimeiroAcessoAlunoEntrada
+from src.schemas.aluno import (
+    PerfilAlunoAtualizar,
+    PerfilAlunoDados,
+    PerfilAlunoResposta,
+    PrimeiroAcessoAlunoEntrada,
+)
 from src.schemas.auth import (
     EsqueciSenhaEntrada,
     LoginEntrada,
@@ -35,6 +42,21 @@ def _resposta_token(usuario: Usuario) -> TokenResposta:
         access_token=criar_token(usuario.id, usuario.versao_token),
         expires_in=segundos_validade_token(),
         usuario=UsuarioResposta.model_validate(usuario),
+    )
+
+
+def _resposta_perfil(usuario: Usuario, aluno: Aluno) -> PerfilAlunoResposta:
+    return PerfilAlunoResposta(
+        id=usuario.id,
+        nome_completo=usuario.nome_completo,
+        email=usuario.email,
+        perfil=PerfilAlunoDados.model_validate(aluno),
+    )
+
+
+def _perfil_nao_encontrado() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND, detail="Perfil não encontrado"
     )
 
 
@@ -157,6 +179,47 @@ def primeiro_acesso_aluno(
 @router.get("/me")
 def me(usuario: UsuarioAtual) -> UsuarioResposta:
     return UsuarioResposta.model_validate(usuario)
+
+
+@router.get("/me/perfil")
+def meu_perfil(usuario: AlunoAtual, sessao: SessaoDep) -> PerfilAlunoResposta:
+    try:
+        aluno = usuario_service.obter_perfil_aluno(sessao, usuario)
+    except usuario_service.PerfilNaoEncontrado:
+        raise _perfil_nao_encontrado() from None
+    return _resposta_perfil(usuario, aluno)
+
+
+@router.patch("/me/perfil")
+def atualizar_meu_perfil(
+    dados: PerfilAlunoAtualizar, usuario: AlunoAtual, sessao: SessaoDep
+) -> PerfilAlunoResposta:
+    """Altera só os campos enviados e devolve o perfil atualizado.
+
+    Aluno com responsável edita `responsavel_nome`, `responsavel_cpf` e
+    `responsavel_telefone`; aluno sem responsável edita `telefone`.
+    `nome_completo` vale para os dois.
+    """
+    try:
+        aluno = usuario_service.atualizar_perfil_aluno(
+            sessao, usuario, **dados.model_dump(exclude_unset=True)
+        )
+    except usuario_service.PerfilNaoEncontrado:
+        raise _perfil_nao_encontrado() from None
+    except usuario_service.CamposNaoPermitidos as erro:
+        # Mesmo formato dos erros de validação, para o front marcar o campo.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=[
+                {
+                    "type": "campo_nao_permitido",
+                    "loc": ["body", campo],
+                    "msg": "campo não permitido para este perfil",
+                }
+                for campo in erro.campos
+            ],
+        ) from None
+    return _resposta_perfil(usuario, aluno)
 
 
 @router.post("/renovar")

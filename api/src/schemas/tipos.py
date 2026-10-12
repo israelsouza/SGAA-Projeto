@@ -114,3 +114,11 @@ Telefone = Annotated[
     BeforeValidator(_apenas_digitos),
     StringConstraints(pattern=r"^[1-9][0-9]{9,10}$"),
 ]
+
+# Termo de busca das listagens. Recusa caracteres de controle porque o
+# PostgreSQL não aceita NUL em texto.
+Busca = Annotated[
+    str,
+    AfterValidator(_normalizar_nome),
+    StringConstraints(max_length=100),
+]

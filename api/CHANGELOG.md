@@ -21,7 +21,7 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
-Banco: revisão `0002` do Alembic.
+Banco: revisão `0003` do Alembic.
 
 ### Adicionado
 
@@ -30,12 +30,16 @@ Banco: revisão `0002` do Alembic.
 - Redefinição de senha por código enviado por e-mail: `POST /auth/esqueci-senha` e `POST /auth/redefinir-senha`.
 - Primeiro acesso do aluno, separado da redefinição de senha: `POST /auth/primeiro-acesso/codigo`, `POST /auth/primeiro-acesso/validar-codigo` e `POST /auth/primeiro-acesso/aluno`.
 - Cadastro de aluno pela professora em `POST /usuarios/alunos`, com envio do e-mail de acesso.
+- Listagem de alunos para a professora em `GET /usuarios/alunos`, paginada e com busca por nome ou e-mail que ignora maiúsculas e acentos. Mostra só quem concluiu o primeiro acesso.
+- Detalhe do aluno em `GET /usuarios/alunos/{id}`, com os dados do perfil e do responsável. Os campos `aulas` e `pagamentos` já existem na resposta, ainda sempre vazios.
+- Perfil do próprio aluno em `GET /auth/me/perfil` e edição em `PATCH /auth/me/perfil`: nome, telefone e dados do responsável. E-mail, CPF do aluno e data de nascimento não são editáveis.
 - Modelos e migrações de `usuario`, `codigo_verificacao` (`0001`) e `aluno` (`0002`), com campos de auditoria e soft delete.
+- Migração `0003`, que habilita a extensão `unaccent` do PostgreSQL, usada na busca de alunos.
 - Envio de e-mail com backend `console` (apenas loga) ou `smtp`.
 - Script de criação da conta da professora: `python -m src.scripts.criar_professor`.
 - Script `aplicar_migracoes.sh`, para aplicar as migrações em produção ou homologação.
 - Observabilidade com o Logfire, ligada pela variável `LOGFIRE_TOKEN`: requisições, consultas SQL, exceções e logs, sem enviar os dados recebidos nas rotas.
-- Testes automatizados de autenticação, primeiro acesso, usuários e schemas.
+- Testes automatizados de autenticação, primeiro acesso, usuários, alunos, perfil e schemas.
 - Documentação: guia de migrações com Alembic, variáveis de ambiente e comandos úteis.
 
 ### Alterado
