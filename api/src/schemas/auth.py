@@ -50,7 +50,3 @@ class TokenPrimeiroAcessoResposta(BaseModel):
     token_primeiro_acesso: str
     expires_in: int
     usuario: UsuarioResposta
-
-
-class MensagemResposta(BaseModel):
-    mensagem: str

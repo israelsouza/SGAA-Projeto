@@ -16,6 +16,12 @@ A referência de cada rota (entrada, saída, campos e status) é o Swagger, em `
 - Campos desconhecidos no corpo são rejeitados com `422`.
 - Rotas autenticadas exigem o cabeçalho `Authorization: Bearer <token>`.
 
+### Versão
+
+Todas as rotas da API ficam sob o prefixo `/v1`, por exemplo `POST /v1/auth/login`. Uma mudança incompatível em um recurso entra em uma versão nova (`/v2`), sem tirar a anterior do ar.
+
+Ficam fora da versão a documentação (`/docs`, `/redoc`, `/openapi.json`) e a checagem de saúde (`GET /api/health`).
+
 ### Tokens
 
 | Token | Como obter | Onde vale |
@@ -23,29 +29,64 @@ A referência de cada rota (entrada, saída, campos e status) é o Swagger, em `
 | Token de acesso (`access_token`) | Login ou conclusão do primeiro acesso | Rotas autenticadas. Algumas exigem usuário do tipo `professor` ou `aluno`. |
 | `token_primeiro_acesso` | Validação do código de primeiro acesso | Apenas no envio do formulário de primeiro acesso |
 
-### Formato dos erros
+### Formato das respostas
 
-| Status | Corpo | Quando |
+Toda resposta das rotas `/v1`, de sucesso ou de erro, tem o mesmo envelope:
+
+| Campo | Tipo | Conteúdo |
 | --- | --- | --- |
-| `422` | `{"detail": [{"type": "...", "loc": ["body", "campo"], "msg": "..."}]}` | Corpo ou parâmetro inválido. `loc` indica o campo (`["query", "campo"]` ou `["path", "campo"]` para parâmetros da URL); o valor enviado nunca é devolvido. |
-| Demais | `{"detail": "mensagem"}` | Erros de regra de negócio, autenticação e permissão. |
+| `sucesso` | booleano | `true` nas respostas `2xx` e `false` nas demais. |
+| `mensagem` | texto | Resumo do resultado, pronto para exibir. |
+| `dados` | objeto ou `null` | O recurso ou resultado da rota. `null` nos erros e nas rotas que não devolvem nada. |
+| `erros` | lista | Só nos erros de validação (`422`): um item por campo recusado. |
 
-Erros comuns a todas as rotas autenticadas:
+O status HTTP continua indicando o resultado; `sucesso` apenas o repete no corpo.
 
-| Status | `detail` | Quando |
+```json
+{
+  "sucesso": true,
+  "mensagem": "Aluno encontrado",
+  "dados": { "id": 7, "nome_completo": "Maria Silva" }
+}
+```
+
+```json
+{ "sucesso": false, "mensagem": "Aluno não encontrado", "dados": null }
+```
+
+Erro de validação, para corpo ou parâmetro inválido:
+
+```json
+{
+  "sucesso": false,
+  "mensagem": "Dados inválidos",
+  "dados": null,
+  "erros": [
+    { "local": ["body", "telefone"], "tipo": "string_pattern_mismatch", "mensagem": "..." }
+  ]
+}
+```
+
+- `local` indica onde está o campo: `["body", "campo"]` para o corpo, `["query", "campo"]` ou `["path", "campo"]` para parâmetros da URL.
+- O valor enviado nunca é devolvido.
+
+Erros comuns:
+
+| Status | `mensagem` | Quando |
 | --- | --- | --- |
 | `401` | `Não autenticado` | Token ausente, malformado, expirado, invalidado ou do tipo errado para a rota. |
 | `403` | `Sem permissão para esta ação` | Token válido, mas o tipo de usuário não pode usar a rota. |
-
-Rotas que buscam um registro respondem `404` quando ele não existe ou foi removido.
+| `404` | `Recurso não encontrado` | A rota não existe. Rotas que buscam um registro também respondem `404`, com mensagem própria, quando ele não existe ou foi removido. |
+| `405` | `Método não permitido` | A rota existe, mas não aceita o método usado. |
+| `500` | `Erro interno. Tente novamente em instantes.` | Falha inesperada no servidor. |
 
 ### Paginação
 
-As listagens recebem os parâmetros `pagina` e `tamanho` e respondem `{"itens": [...], "total": N}`.
+As listagens recebem os parâmetros `pagina` e `tamanho` e devolvem em `dados` o objeto `{"itens": [...], "total": N}`.
 
 | Parâmetro | Valores | Padrão |
 | --- | --- | --- |
-| `pagina` | A partir de 1 | 1 |
+| `pagina` | De 1 a 500 | 1 |
 | `tamanho` | De 1 a 100 | 20 |
 
 - `total` conta todos os registros que atendem ao filtro, não só os da página.
@@ -64,20 +105,20 @@ Rotas `PATCH` alteram só os campos enviados; os demais ficam como estão.
 
 ### Login
 
-`POST /auth/login` devolve o token de acesso.
+`POST /v1/auth/login` devolve o token de acesso.
 
 - A resposta de erro é idêntica para e-mail inexistente, senha errada, conta sem senha e conta bloqueada.
 - Após 5 senhas erradas seguidas, a conta fica bloqueada por 15 minutos.
-- `POST /auth/sair-de-todos` invalida todos os tokens do usuário, inclusive o usado na chamada.
+- `POST /v1/auth/sair-de-todos` invalida todos os tokens do usuário, inclusive o usado na chamada.
 
 ### Primeiro acesso do aluno
 
 | Passo | Quem | Rota | Resultado |
 | --- | --- | --- | --- |
-| 0 | Professor | `POST /usuarios/alunos` | Conta criada sem senha; aluno recebe um código por e-mail (vale 72 h). |
-| 1 | Aluno | `POST /auth/primeiro-acesso/codigo` | Opcional: pede um código novo (vale 15 min) se o do convite expirou ou foi usado. |
-| 2 | Aluno | `POST /auth/primeiro-acesso/validar-codigo` | Código consumido; devolve `token_primeiro_acesso` (vale 30 min). |
-| 3 | Aluno | `POST /auth/primeiro-acesso/aluno` | Perfil e senha gravados; devolve o `access_token` (já entra logado). |
+| 0 | Professor | `POST /v1/usuarios/alunos` | Conta criada sem senha; aluno recebe um código por e-mail (vale 72 h). |
+| 1 | Aluno | `POST /v1/auth/primeiro-acesso/codigo` | Opcional: pede um código novo (vale 15 min) se o do convite expirou ou foi usado. |
+| 2 | Aluno | `POST /v1/auth/primeiro-acesso/validar-codigo` | Código consumido; devolve `token_primeiro_acesso` (vale 30 min). |
+| 3 | Aluno | `POST /v1/auth/primeiro-acesso/aluno` | Perfil e senha gravados; devolve o `access_token` (já entra logado). |
 
 Enquanto o passo 3 não é concluído, a conta não tem senha: o login falha e a redefinição de senha não atende esse e-mail.
 
@@ -90,8 +131,8 @@ Enquanto o passo 3 não é concluído, a conta não tem senha: o login falha e a
 
 | Passo | Rota | Resultado |
 | --- | --- | --- |
-| 1 | `POST /auth/esqueci-senha` | Código enviado por e-mail (vale 15 min). |
-| 2 | `POST /auth/redefinir-senha` | Senha trocada; todos os tokens anteriores deixam de valer. |
+| 1 | `POST /v1/auth/esqueci-senha` | Código enviado por e-mail (vale 15 min). |
+| 2 | `POST /v1/auth/redefinir-senha` | Senha trocada; todos os tokens anteriores deixam de valer. |
 
 Só atende contas que já concluíram o primeiro acesso.
 
@@ -102,8 +143,8 @@ Só atende contas que já concluíram o primeiro acesso.
 
 | Rota | Resultado |
 | --- | --- |
-| `GET /usuarios/alunos` | Lista paginada, em ordem alfabética, com `id`, `nome_completo`, `email` e `telefone`. |
-| `GET /usuarios/alunos/{id}` | Dados do aluno, perfil e responsável. |
+| `GET /v1/usuarios/alunos` | Lista paginada, em ordem alfabética, com `id`, `nome_completo`, `email` e `telefone`. |
+| `GET /v1/usuarios/alunos/{id}` | Dados do aluno, perfil e responsável. |
 
 - **Quem aparece na lista**: só alunos que concluíram o primeiro acesso. Um aluno cadastrado que ainda não ativou a conta não é listado; o detalhe dele responde pelo `id` devolvido no cadastro, com `perfil` nulo e `primeiro_acesso_concluido` falso.
 - **Telefone da lista**: o do aluno ou, quando ele tem responsável, o do responsável.
@@ -114,10 +155,10 @@ Só atende contas que já concluíram o primeiro acesso.
 
 | Rota | Resultado |
 | --- | --- |
-| `GET /auth/me/perfil` | Dados do aluno, perfil e responsável. |
-| `PATCH /auth/me/perfil` | Altera os campos enviados e devolve o perfil atualizado. |
+| `GET /v1/auth/me/perfil` | Dados do aluno, perfil e responsável. |
+| `PATCH /v1/auth/me/perfil` | Altera os campos enviados e devolve o perfil atualizado. |
 
-`GET /auth/me` continua devolvendo só os dados básicos da conta, para qualquer tipo de usuário.
+`GET /v1/auth/me` continua devolvendo só os dados básicos da conta, para qualquer tipo de usuário.
 
 Campos que o aluno pode editar:
 
@@ -127,7 +168,7 @@ Campos que o aluno pode editar:
 | `telefone` | Sim | Não |
 | `responsavel_nome`, `responsavel_cpf`, `responsavel_telefone` | Não | Sim |
 
-- **Campo do outro grupo**: gera `422` com `type` igual a `campo_nao_permitido` e `loc` apontando o campo.
+- **Campo do outro grupo**: gera `422`, com um item em `erros` de `tipo` igual a `campo_nao_permitido` e `local` apontando o campo.
 - **Campos bloqueados**: `email`, `cpf` e `data_nascimento` não são editáveis e geram `422`, como qualquer campo desconhecido.
 - **Troca de responsável**: basta enviar os três campos `responsavel_*` na mesma chamada.
 - **Quem tem responsável**: vale o que foi definido no primeiro acesso (`possui_responsavel`), não a idade atual. Um aluno que completa 18 anos continua editando os dados do responsável e ainda não tem como cadastrar CPF e telefone próprios.

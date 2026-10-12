@@ -10,6 +10,7 @@ from src.schemas.paginacao import (
     TAMANHO_PADRAO,
     Pagina,
 )
+from src.schemas.resposta import Resposta
 from src.schemas.tipos import Busca
 from src.schemas.usuario import AlunoCriar, UsuarioResposta
 from src.services import usuario_service
@@ -23,7 +24,7 @@ ID_MAXIMO = 2_147_483_647
 @router.post("/alunos", status_code=status.HTTP_201_CREATED)
 def criar_aluno(
     dados: AlunoCriar, _: ProfessorAtual, sessao: SessaoDep, enviador: EnviadorEmailDep
-) -> UsuarioResposta:
+) -> Resposta[UsuarioResposta]:
     try:
         usuario = usuario_service.criar_aluno(
             sessao, enviador, nome_completo=dados.nome_completo, email=dados.email
@@ -37,7 +38,9 @@ def criar_aluno(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Não foi possível enviar o e-mail de acesso. Tente novamente.",
         ) from None
-    return UsuarioResposta.model_validate(usuario)
+    return Resposta(
+        mensagem="Aluno cadastrado", dados=UsuarioResposta.model_validate(usuario)
+    )
 
 
 @router.get("/alunos")
@@ -47,7 +50,7 @@ def listar_alunos(
     pagina: Annotated[int, Query(ge=1, le=PAGINA_MAXIMA)] = 1,
     tamanho: Annotated[int, Query(ge=1, le=TAMANHO_MAXIMO)] = TAMANHO_PADRAO,
     busca: Annotated[Busca | None, Query()] = None,
-) -> Pagina[AlunoListaItem]:
+) -> Resposta[Pagina[AlunoListaItem]]:
     """Alunos que concluíram o primeiro acesso, em ordem alfabética.
 
     `busca` procura um trecho no nome ou no e-mail, sem diferenciar maiúsculas
@@ -56,8 +59,11 @@ def listar_alunos(
     itens, total = usuario_service.listar_alunos(
         sessao, pagina=pagina, tamanho=tamanho, busca=busca
     )
-    return Pagina[AlunoListaItem](
-        itens=[AlunoListaItem.model_validate(item) for item in itens], total=total
+    return Resposta(
+        mensagem="Alunos listados",
+        dados=Pagina(
+            itens=[AlunoListaItem.model_validate(item) for item in itens], total=total
+        ),
     )
 
 
@@ -66,7 +72,7 @@ def detalhar_aluno(
     aluno_id: Annotated[int, Path(ge=1, le=ID_MAXIMO)],
     _: ProfessorAtual,
     sessao: SessaoDep,
-) -> AlunoDetalheResposta:
+) -> Resposta[AlunoDetalheResposta]:
     """`aulas` e `pagamentos` ainda vêm sempre vazios."""
     try:
         usuario, aluno = usuario_service.obter_aluno(sessao, aluno_id)
@@ -74,10 +80,13 @@ def detalhar_aluno(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Aluno não encontrado"
         ) from None
-    return AlunoDetalheResposta(
-        id=usuario.id,
-        nome_completo=usuario.nome_completo,
-        email=usuario.email,
-        primeiro_acesso_concluido=usuario.senha is not None,
-        perfil=PerfilAlunoDados.model_validate(aluno) if aluno else None,
+    return Resposta(
+        mensagem="Aluno encontrado",
+        dados=AlunoDetalheResposta(
+            id=usuario.id,
+            nome_completo=usuario.nome_completo,
+            email=usuario.email,
+            primeiro_acesso_concluido=usuario.senha is not None,
+            perfil=PerfilAlunoDados.model_validate(aluno) if aluno else None,
+        ),
     )

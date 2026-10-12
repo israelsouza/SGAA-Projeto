@@ -54,18 +54,18 @@ def test_sem_token_nao_liga_nada(monkeypatch):
 def test_requisicao_instrumentada_nao_exporta_dados_sensiveis(client, capfire):
     with logfire.instrument_fastapi(app, request_attributes_mapper=_sem_valores):
         invalida = client.post(
-            "/auth/primeiro-acesso/validar-codigo",
+            "/v1/auth/primeiro-acesso/validar-codigo",
             json={"email": "vazamento@exemplo.com", "codigo": CODIGO},
         )
         login = client.post(
-            "/auth/login", json={"email": "vazamento@exemplo.com", "senha": SENHA}
+            "/v1/auth/login", json={"email": "vazamento@exemplo.com", "senha": SENHA}
         )
     assert invalida.status_code == 422
     assert login.status_code == 401
 
     spans = capfire.exporter.exported_spans_as_dict()
     exportado = json.dumps(spans, default=str)
-    assert "/auth/login" in exportado
+    assert "/v1/auth/login" in exportado
     assert "vazamento@exemplo.com" not in exportado
     assert SENHA not in exportado
     assert CODIGO not in exportado

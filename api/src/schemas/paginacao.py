@@ -2,8 +2,8 @@ from pydantic import BaseModel
 
 TAMANHO_PADRAO = 20
 TAMANHO_MAXIMO = 100
-# Teto para o OFFSET não estourar o inteiro do PostgreSQL.
-PAGINA_MAXIMA = 10_000
+# Com 100 itens por página, cobre 50 mil registros.
+PAGINA_MAXIMA = 500
 
 
 class Pagina[T](BaseModel):
