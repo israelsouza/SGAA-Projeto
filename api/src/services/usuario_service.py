@@ -1,7 +1,9 @@
 import logging
+import unicodedata
+from collections.abc import Sequence
 from datetime import date, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import Row, String, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -28,6 +30,20 @@ class PrimeiroAcessoJaConcluido(Exception):
 
 class FalhaEnvioEmail(Exception):
     pass
+
+
+class AlunoNaoEncontrado(Exception):
+    pass
+
+
+class PerfilNaoEncontrado(Exception):
+    pass
+
+
+class CamposNaoPermitidos(Exception):
+    def __init__(self, campos: list[str]) -> None:
+        super().__init__(campos)
+        self.campos = campos
 
 
 def criar_usuario(
@@ -134,3 +150,121 @@ def concluir_primeiro_acesso_aluno(
     except IntegrityError as erro:
         sessao.rollback()
         raise CpfJaCadastrado from erro
+
+
+def _sem_acentos(texto: str) -> str:
+    return "".join(
+        caractere
+        for caractere in unicodedata.normalize("NFD", texto)
+        if unicodedata.category(caractere) != "Mn"
+    )
+
+
+def listar_alunos(
+    sessao: Session, *, pagina: int, tamanho: int, busca: str | None = None
+) -> tuple[Sequence[Row], int]:
+    """Página de alunos que concluíram o primeiro acesso, e o total sem paginar.
+
+    `busca` casa com trecho do nome ou do e-mail, sem diferenciar maiúsculas
+    nem acentos.
+    """
+    consulta = (
+        select(
+            Usuario.id,
+            Usuario.nome_completo,
+            Usuario.email,
+            func.coalesce(Aluno.telefone, Aluno.responsavel_telefone).label("telefone"),
+        )
+        .join(Aluno, Aluno.usuario_id == Usuario.id)
+        .where(
+            Usuario.tipo == TipoUsuario.ALUNO,
+            Usuario.deletado_em.is_(None),
+            Usuario.senha.is_not(None),
+        )
+    )
+    if busca:
+        # O termo vai como literal, sem acentos, para o autoescape tratar % e _.
+        termo = _sem_acentos(busca)
+        consulta = consulta.where(
+            or_(
+                func.unaccent(Usuario.nome_completo, type_=String).icontains(
+                    termo, autoescape=True
+                ),
+                func.unaccent(Usuario.email, type_=String).icontains(
+                    termo, autoescape=True
+                ),
+            )
+        )
+
+    total = sessao.scalar(select(func.count()).select_from(consulta.subquery()))
+    itens = sessao.execute(
+        consulta.order_by(func.lower(func.unaccent(Usuario.nome_completo)), Usuario.id)
+        .limit(tamanho)
+        .offset((pagina - 1) * tamanho)
+    ).all()
+    return itens, total
+
+
+def obter_aluno(sessao: Session, aluno_id: int) -> tuple[Usuario, Aluno | None]:
+    """Devolve o aluno e o perfil, que é None antes do primeiro acesso.
+
+    Levanta AlunoNaoEncontrado.
+    """
+    usuario = sessao.get(Usuario, aluno_id)
+    if (
+        usuario is None
+        or usuario.deletado_em is not None
+        or usuario.tipo != TipoUsuario.ALUNO
+    ):
+        raise AlunoNaoEncontrado
+    return usuario, sessao.get(Aluno, usuario.id)
+
+
+def obter_perfil_aluno(sessao: Session, usuario: Usuario) -> Aluno:
+    """Levanta PerfilNaoEncontrado."""
+    aluno = sessao.get(Aluno, usuario.id)
+    if aluno is None:
+        raise PerfilNaoEncontrado
+    return aluno
+
+
+def atualizar_perfil_aluno(
+    sessao: Session,
+    usuario: Usuario,
+    *,
+    nome_completo: str | None = None,
+    telefone: str | None = None,
+    responsavel_nome: str | None = None,
+    responsavel_cpf: str | None = None,
+    responsavel_telefone: str | None = None,
+) -> Aluno:
+    """Altera só os campos informados (None significa "não alterar").
+
+    Quem tem responsável só altera os dados dele; quem não tem, só o próprio
+    telefone. Levanta PerfilNaoEncontrado e CamposNaoPermitidos.
+    """
+    aluno = obter_perfil_aluno(sessao, usuario)
+
+    do_aluno = {"telefone": telefone}
+    do_responsavel = {
+        "responsavel_nome": responsavel_nome,
+        "responsavel_cpf": responsavel_cpf,
+        "responsavel_telefone": responsavel_telefone,
+    }
+    # Vale o que foi gravado no primeiro acesso, não a idade de hoje.
+    permitidos, proibidos = (
+        (do_responsavel, do_aluno)
+        if aluno.possui_responsavel
+        else (do_aluno, do_responsavel)
+    )
+    nao_permitidos = [campo for campo, valor in proibidos.items() if valor is not None]
+    if nao_permitidos:
+        raise CamposNaoPermitidos(nao_permitidos)
+
+    if nome_completo is not None:
+        usuario.nome_completo = nome_completo
+    for campo, valor in permitidos.items():
+        if valor is not None:
+            setattr(aluno, campo, valor)
+    sessao.commit()
+    return aluno

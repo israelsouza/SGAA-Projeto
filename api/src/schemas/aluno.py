@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
-from typing import Self
+from typing import Any, Self
 
-from pydantic import field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from src.schemas.base import SchemaEntrada
 from src.schemas.tipos import Cpf, NomeCompleto, NovaSenha, Telefone
@@ -56,3 +56,66 @@ class PrimeiroAcessoAlunoEntrada(SchemaEntrada):
     @property
     def possui_responsavel(self) -> bool:
         return calcular_idade(self.data_nascimento, hoje()) < MAIORIDADE
+
+
+class PerfilAlunoAtualizar(SchemaEntrada):
+    """Edição do perfil pelo próprio aluno: só o que for enviado é alterado.
+
+    Quem tem responsável edita os campos `responsavel_*`; quem não tem edita
+    `telefone`. E-mail, CPF do aluno e data de nascimento não são editáveis.
+    """
+
+    nome_completo: NomeCompleto | None = None
+    telefone: Telefone | None = None
+    responsavel_nome: NomeCompleto | None = None
+    responsavel_cpf: Cpf | None = None
+    responsavel_telefone: Telefone | None = None
+
+    @model_validator(mode="after")
+    def _campos_enviados(self) -> Self:
+        if not self.model_fields_set:
+            raise ValueError("informe ao menos um campo")
+        if any(getattr(self, campo) is None for campo in self.model_fields_set):
+            raise ValueError("os campos enviados não podem ser nulos")
+        return self
+
+
+class AlunoListaItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nome_completo: str
+    email: str
+    # Do responsável, quando o aluno tem um.
+    telefone: str
+
+
+class PerfilAlunoDados(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    data_nascimento: date
+    possui_responsavel: bool
+    cpf: str | None
+    telefone: str | None
+    responsavel_nome: str | None
+    responsavel_cpf: str | None
+    responsavel_telefone: str | None
+
+
+class PerfilAlunoResposta(BaseModel):
+    id: int
+    nome_completo: str
+    email: str
+    perfil: PerfilAlunoDados
+
+
+class AlunoDetalheResposta(BaseModel):
+    id: int
+    nome_completo: str
+    email: str
+    primeiro_acesso_concluido: bool
+    # Nulo enquanto o aluno não conclui o primeiro acesso.
+    perfil: PerfilAlunoDados | None
+    # Reservados: sempre vazios até existirem os módulos de aulas e pagamentos.
+    aulas: list[dict[str, Any]] = []
+    pagamentos: list[dict[str, Any]] = []

@@ -11,7 +11,7 @@ from tests.conftest import SENHA_PADRAO, cabecalho
 
 
 def _login(client, email, senha=SENHA_PADRAO):
-    return client.post("/auth/login", json={"email": email, "senha": senha})
+    return client.post("/v1/auth/login", json={"email": email, "senha": senha})
 
 
 # --- login ---
@@ -20,7 +20,9 @@ def _login(client, email, senha=SENHA_PADRAO):
 def test_login_com_sucesso(client, aluno):
     resposta = _login(client, "  ALUNO@exemplo.com ")
     assert resposta.status_code == 200
-    corpo = resposta.json()
+    assert resposta.json()["sucesso"] is True
+    assert resposta.json()["mensagem"] == "Login realizado"
+    corpo = resposta.json()["dados"]
     assert corpo["token_type"] == "bearer"
     assert corpo["expires_in"] == 30 * 24 * 3600
     assert corpo["usuario"] == {
@@ -30,10 +32,10 @@ def test_login_com_sucesso(client, aluno):
         "tipo": "aluno",
     }
     me = client.get(
-        "/auth/me", headers={"Authorization": f"Bearer {corpo['access_token']}"}
+        "/v1/auth/me", headers={"Authorization": f"Bearer {corpo['access_token']}"}
     )
     assert me.status_code == 200
-    assert me.json()["id"] == aluno.id
+    assert me.json()["dados"]["id"] == aluno.id
 
 
 def test_login_falhas_tem_a_mesma_resposta(client, aluno, criar_usuario, sessao):
@@ -75,12 +77,20 @@ def test_login_com_sucesso_zera_tentativas(client, aluno):
 
 def test_erro_de_validacao_nao_ecoa_a_senha(client):
     resposta = client.post(
-        "/auth/login",
+        "/v1/auth/login",
         json={"email": "invalido", "senha": "minha-senha-secreta", "x": 1},
     )
     assert resposta.status_code == 422
     assert "minha-senha-secreta" not in resposta.text
-    assert {tuple(erro["loc"]) for erro in resposta.json()["detail"]} == {
+    corpo = resposta.json()
+    assert set(corpo) == {"sucesso", "mensagem", "dados", "erros"}
+    assert (corpo["sucesso"], corpo["mensagem"], corpo["dados"]) == (
+        False,
+        "Dados inválidos",
+        None,
+    )
+    assert set(corpo["erros"][0]) == {"local", "tipo", "mensagem"}
+    assert {tuple(erro["local"]) for erro in resposta.json()["erros"]} == {
         ("body", "email"),
         ("body", "x"),
     }
@@ -90,13 +100,20 @@ def test_erro_de_validacao_nao_ecoa_a_senha(client):
 
 
 def test_rota_protegida_sem_token(client):
-    resposta = client.get("/auth/me")
+    resposta = client.get("/v1/auth/me")
     assert resposta.status_code == 401
     assert resposta.headers["www-authenticate"] == "Bearer"
+    assert resposta.json() == {
+        "sucesso": False,
+        "mensagem": "Não autenticado",
+        "dados": None,
+    }
 
 
 def test_rota_protegida_com_token_malformado(client):
-    resposta = client.get("/auth/me", headers={"Authorization": "Bearer nao-e-um-jwt"})
+    resposta = client.get(
+        "/v1/auth/me", headers={"Authorization": "Bearer nao-e-um-jwt"}
+    )
     assert resposta.status_code == 401
 
 
@@ -107,7 +124,9 @@ def test_token_expirado(client, aluno):
         chave,
         algorithm="HS256",
     )
-    resposta = client.get("/auth/me", headers={"Authorization": f"Bearer {expirado}"})
+    resposta = client.get(
+        "/v1/auth/me", headers={"Authorization": f"Bearer {expirado}"}
+    )
     assert resposta.status_code == 401
 
 
@@ -117,7 +136,7 @@ def test_token_assinado_com_outra_chave(client, aluno):
         "outra-chave-qualquer-com-mais-de-32-caracteres",
         algorithm="HS256",
     )
-    resposta = client.get("/auth/me", headers={"Authorization": f"Bearer {forjado}"})
+    resposta = client.get("/v1/auth/me", headers={"Authorization": f"Bearer {forjado}"})
     assert resposta.status_code == 401
 
 
@@ -128,7 +147,7 @@ def test_token_sem_assinatura_e_recusado(client, aluno):
         algorithm="none",
     )
     resposta = client.get(
-        "/auth/me", headers={"Authorization": f"Bearer {sem_assinatura}"}
+        "/v1/auth/me", headers={"Authorization": f"Bearer {sem_assinatura}"}
     )
     assert resposta.status_code == 401
 
@@ -137,28 +156,36 @@ def test_token_de_usuario_removido(client, aluno, sessao):
     headers = cabecalho(aluno)
     aluno.deletado_em = agora()
     sessao.commit()
-    assert client.get("/auth/me", headers=headers).status_code == 401
+    assert client.get("/v1/auth/me", headers=headers).status_code == 401
 
 
 def test_sair_de_todos_invalida_tokens_antigos(client, aluno):
     headers = cabecalho(aluno)
-    assert client.post("/auth/sair-de-todos", headers=headers).status_code == 204
-    assert client.get("/auth/me", headers=headers).status_code == 401
-    assert client.get("/auth/me", headers=cabecalho(aluno)).status_code == 200
+    resposta = client.post("/v1/auth/sair-de-todos", headers=headers)
+    assert resposta.status_code == 200
+    assert resposta.json() == {
+        "sucesso": True,
+        "mensagem": "Sessões encerradas",
+        "dados": None,
+    }
+    assert client.get("/v1/auth/me", headers=headers).status_code == 401
+    assert client.get("/v1/auth/me", headers=cabecalho(aluno)).status_code == 200
 
 
 def test_renovar_devolve_token_valido(client, aluno):
-    resposta = client.post("/auth/renovar", headers=cabecalho(aluno))
+    resposta = client.post("/v1/auth/renovar", headers=cabecalho(aluno))
     assert resposta.status_code == 200
-    novo = resposta.json()["access_token"]
+    novo = resposta.json()["dados"]["access_token"]
     assert (
-        client.get("/auth/me", headers={"Authorization": f"Bearer {novo}"}).status_code
+        client.get(
+            "/v1/auth/me", headers={"Authorization": f"Bearer {novo}"}
+        ).status_code
         == 200
     )
 
 
 def test_renovar_exige_token(client):
-    assert client.post("/auth/renovar").status_code == 401
+    assert client.post("/v1/auth/renovar").status_code == 401
 
 
 # --- recuperação de senha ---
@@ -175,29 +202,29 @@ def _codigo_ativo(sessao, usuario):
 def test_recuperacao_de_senha_fluxo_completo(client, aluno, enviador):
     token_antigo = cabecalho(aluno)
 
-    resposta = client.post("/auth/esqueci-senha", json={"email": aluno.email})
+    resposta = client.post("/v1/auth/esqueci-senha", json={"email": aluno.email})
     assert resposta.status_code == 202
     assert enviador.mensagens[-1]["para"] == aluno.email
 
     resposta = client.post(
-        "/auth/redefinir-senha",
+        "/v1/auth/redefinir-senha",
         json={
             "email": aluno.email,
             "codigo": enviador.ultimo_codigo(),
             "nova_senha": "Nova-Senha-456",
         },
     )
-    assert resposta.status_code == 204
+    assert resposta.status_code == 200
 
     assert _login(client, aluno.email).status_code == 401
     assert _login(client, aluno.email, "Nova-Senha-456").status_code == 200
-    assert client.get("/auth/me", headers=token_antigo).status_code == 401
+    assert client.get("/v1/auth/me", headers=token_antigo).status_code == 401
 
 
 def test_esqueci_senha_nao_revela_se_o_email_existe(client, aluno, enviador):
-    existente = client.post("/auth/esqueci-senha", json={"email": aluno.email})
+    existente = client.post("/v1/auth/esqueci-senha", json={"email": aluno.email})
     inexistente = client.post(
-        "/auth/esqueci-senha", json={"email": "ninguem@exemplo.com"}
+        "/v1/auth/esqueci-senha", json={"email": "ninguem@exemplo.com"}
     )
     assert existente.status_code == inexistente.status_code == 202
     assert existente.json() == inexistente.json()
@@ -207,43 +234,45 @@ def test_esqueci_senha_nao_revela_se_o_email_existe(client, aluno, enviador):
 def test_esqueci_senha_responde_202_mesmo_se_o_envio_falhar(client, aluno, enviador):
     enviador.falhar = True
     assert (
-        client.post("/auth/esqueci-senha", json={"email": aluno.email}).status_code
+        client.post("/v1/auth/esqueci-senha", json={"email": aluno.email}).status_code
         == 202
     )
 
 
 def test_codigo_nao_e_guardado_em_texto_puro(client, aluno, enviador, sessao):
-    client.post("/auth/esqueci-senha", json={"email": aluno.email})
+    client.post("/v1/auth/esqueci-senha", json={"email": aluno.email})
     registro = _codigo_ativo(sessao, aluno)
     assert registro.codigo_hash != enviador.ultimo_codigo()
     assert len(registro.codigo_hash) == 64
 
 
 def test_codigo_errado_e_recusado_e_limite_de_tentativas(client, aluno, enviador):
-    client.post("/auth/esqueci-senha", json={"email": aluno.email})
+    client.post("/v1/auth/esqueci-senha", json={"email": aluno.email})
     correto = enviador.ultimo_codigo()
     errado = "000000" if correto != "000000" else "111111"
 
     corpo = {"email": aluno.email, "nova_senha": "Nova-Senha-456"}
     for _ in range(auth_service.MAX_TENTATIVAS_CODIGO):
         resposta = client.post(
-            "/auth/redefinir-senha", json={**corpo, "codigo": errado}
+            "/v1/auth/redefinir-senha", json={**corpo, "codigo": errado}
         )
         assert resposta.status_code == 400
 
     # Esgotadas as tentativas, nem o código correto funciona.
-    resposta = client.post("/auth/redefinir-senha", json={**corpo, "codigo": correto})
+    resposta = client.post(
+        "/v1/auth/redefinir-senha", json={**corpo, "codigo": correto}
+    )
     assert resposta.status_code == 400
     assert _login(client, aluno.email).status_code == 200
 
 
 def test_codigo_expirado(client, aluno, enviador, sessao):
-    client.post("/auth/esqueci-senha", json={"email": aluno.email})
+    client.post("/v1/auth/esqueci-senha", json={"email": aluno.email})
     _codigo_ativo(sessao, aluno).expira_em = agora() - timedelta(seconds=1)
     sessao.commit()
 
     resposta = client.post(
-        "/auth/redefinir-senha",
+        "/v1/auth/redefinir-senha",
         json={
             "email": aluno.email,
             "codigo": enviador.ultimo_codigo(),
@@ -254,21 +283,21 @@ def test_codigo_expirado(client, aluno, enviador, sessao):
 
 
 def test_codigo_nao_pode_ser_reutilizado(client, aluno, enviador):
-    client.post("/auth/esqueci-senha", json={"email": aluno.email})
+    client.post("/v1/auth/esqueci-senha", json={"email": aluno.email})
     corpo = {
         "email": aluno.email,
         "codigo": enviador.ultimo_codigo(),
         "nova_senha": "Nova-Senha-456",
     }
-    assert client.post("/auth/redefinir-senha", json=corpo).status_code == 204
+    assert client.post("/v1/auth/redefinir-senha", json=corpo).status_code == 200
     corpo["nova_senha"] = "Outra-Senha-789"
-    assert client.post("/auth/redefinir-senha", json=corpo).status_code == 400
+    assert client.post("/v1/auth/redefinir-senha", json=corpo).status_code == 400
 
 
 def test_codigo_de_outro_usuario_nao_serve(client, aluno, professor, enviador):
-    client.post("/auth/esqueci-senha", json={"email": aluno.email})
+    client.post("/v1/auth/esqueci-senha", json={"email": aluno.email})
     resposta = client.post(
-        "/auth/redefinir-senha",
+        "/v1/auth/redefinir-senha",
         json={
             "email": professor.email,
             "codigo": enviador.ultimo_codigo(),
@@ -279,9 +308,9 @@ def test_codigo_de_outro_usuario_nao_serve(client, aluno, professor, enviador):
 
 
 def test_intervalo_minimo_entre_codigos(client, aluno, enviador, sessao):
-    client.post("/auth/esqueci-senha", json={"email": aluno.email})
+    client.post("/v1/auth/esqueci-senha", json={"email": aluno.email})
     assert (
-        client.post("/auth/esqueci-senha", json={"email": aluno.email}).status_code
+        client.post("/v1/auth/esqueci-senha", json={"email": aluno.email}).status_code
         == 202
     )
     assert len(enviador.mensagens) == 1
@@ -289,13 +318,13 @@ def test_intervalo_minimo_entre_codigos(client, aluno, enviador, sessao):
     primeiro = enviador.ultimo_codigo()
     _codigo_ativo(sessao, aluno).criado_em = agora() - timedelta(minutes=2)
     sessao.commit()
-    client.post("/auth/esqueci-senha", json={"email": aluno.email})
+    client.post("/v1/auth/esqueci-senha", json={"email": aluno.email})
     assert len(enviador.mensagens) == 2
 
     # O código anterior deixa de valer quando um novo é emitido.
     if enviador.ultimo_codigo() != primeiro:
         resposta = client.post(
-            "/auth/redefinir-senha",
+            "/v1/auth/redefinir-senha",
             json={
                 "email": aluno.email,
                 "codigo": primeiro,
@@ -307,7 +336,7 @@ def test_intervalo_minimo_entre_codigos(client, aluno, enviador, sessao):
 
 def test_limite_de_codigos_por_hora(client, aluno, enviador, sessao):
     for _ in range(auth_service.MAX_CODIGOS_POR_JANELA + 2):
-        client.post("/auth/esqueci-senha", json={"email": aluno.email})
+        client.post("/v1/auth/esqueci-senha", json={"email": aluno.email})
         for registro in sessao.query(CodigoVerificacao).filter_by(usuario_id=aluno.id):
             if agora() - registro.criado_em < timedelta(minutes=2):
                 registro.criado_em = agora() - timedelta(minutes=2)
@@ -318,9 +347,9 @@ def test_limite_de_codigos_por_hora(client, aluno, enviador, sessao):
 def test_redefinir_senha_desbloqueia_o_login(client, aluno, enviador, sessao):
     aluno.bloqueado_ate = agora() + timedelta(minutes=10)
     sessao.commit()
-    client.post("/auth/esqueci-senha", json={"email": aluno.email})
+    client.post("/v1/auth/esqueci-senha", json={"email": aluno.email})
     client.post(
-        "/auth/redefinir-senha",
+        "/v1/auth/redefinir-senha",
         json={
             "email": aluno.email,
             "codigo": enviador.ultimo_codigo(),

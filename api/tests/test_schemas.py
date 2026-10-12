@@ -3,7 +3,11 @@ from datetime import date
 import pytest
 from pydantic import ValidationError
 
-from src.schemas.aluno import PrimeiroAcessoAlunoEntrada, calcular_idade
+from src.schemas.aluno import (
+    PerfilAlunoAtualizar,
+    PrimeiroAcessoAlunoEntrada,
+    calcular_idade,
+)
 from src.schemas.auth import LoginEntrada, RedefinirSenhaEntrada
 from src.schemas.usuario import AlunoCriar
 from tests.conftest import nascido_ha
@@ -160,3 +164,28 @@ def test_codigo_invalido(codigo):
 def test_senha_nao_aparece_no_repr():
     dados = LoginEntrada(email="m@exemplo.com", senha="segredo-123")
     assert "segredo-123" not in repr(dados)
+
+
+def test_edicao_de_perfil_guarda_so_o_que_foi_enviado():
+    dados = PerfilAlunoAtualizar(
+        nome_completo="  Maria   Silva ", responsavel_cpf="390.533.447-05"
+    )
+    assert dados.model_dump(exclude_unset=True) == {
+        "nome_completo": "Maria Silva",
+        "responsavel_cpf": "39053344705",
+    }
+
+
+@pytest.mark.parametrize(
+    "campos",
+    [
+        {},
+        {"telefone": None},
+        {"nome_completo": "Maria Silva", "responsavel_nome": None},
+        {"responsavel_cpf": "12345678900"},
+        {"email": "maria@exemplo.com"},
+    ],
+)
+def test_edicao_de_perfil_invalida(campos):
+    with pytest.raises(ValidationError):
+        PerfilAlunoAtualizar(**campos)

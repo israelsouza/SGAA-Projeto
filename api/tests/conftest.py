@@ -21,10 +21,15 @@ from src.core.database import obter_engine, obter_sessao
 from src.core.email import obter_enviador_email
 from src.core.security import criar_token, hash_senha
 from src.main import app
+from src.models.aluno import Aluno
 from src.models.usuario import TipoUsuario, Usuario
-from src.schemas.aluno import hoje
+from src.schemas.aluno import MAIORIDADE, hoje
 
 SENHA_PADRAO = "senha-correta-123"
+CPF = "52998224725"
+TELEFONE = "11912345678"
+CPF_RESPONSAVEL = "11144477735"
+TELEFONE_RESPONSAVEL = "11987654321"
 
 
 class EnviadorEmailFalso:
@@ -101,6 +106,51 @@ def professor(criar_usuario):
 @pytest.fixture
 def aluno(criar_usuario):
     return criar_usuario("aluno@exemplo.com", TipoUsuario.ALUNO)
+
+
+@pytest.fixture
+def criar_aluno_com_perfil(criar_usuario, sessao):
+    """Aluno que já concluiu o primeiro acesso. Menor de idade ganha responsável."""
+
+    def _criar(
+        email: str,
+        anos: int = 25,
+        nome_completo: str = "Aluno de Teste",
+        cpf: str = CPF,
+    ) -> Usuario:
+        usuario = criar_usuario(email, nome_completo=nome_completo)
+        if anos < MAIORIDADE:
+            perfil = Aluno(
+                usuario_id=usuario.id,
+                data_nascimento=nascido_ha(anos),
+                possui_responsavel=True,
+                responsavel_nome="Ana Souza",
+                responsavel_cpf=CPF_RESPONSAVEL,
+                responsavel_telefone=TELEFONE_RESPONSAVEL,
+            )
+        else:
+            perfil = Aluno(
+                usuario_id=usuario.id,
+                data_nascimento=nascido_ha(anos),
+                possui_responsavel=False,
+                cpf=cpf,
+                telefone=TELEFONE,
+            )
+        sessao.add(perfil)
+        sessao.commit()
+        return usuario
+
+    return _criar
+
+
+@pytest.fixture
+def aluno_maior(criar_aluno_com_perfil):
+    return criar_aluno_com_perfil("maior@exemplo.com", anos=25)
+
+
+@pytest.fixture
+def aluno_menor(criar_aluno_com_perfil):
+    return criar_aluno_com_perfil("menor@exemplo.com", anos=15)
 
 
 def nascido_ha(anos: int) -> date:

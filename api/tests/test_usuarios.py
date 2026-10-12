@@ -8,10 +8,10 @@ def test_professor_cadastra_aluno_e_aluno_define_a_senha(
     client, professor, enviador, sessao
 ):
     resposta = client.post(
-        "/usuarios/alunos", json=NOVO_ALUNO, headers=cabecalho(professor)
+        "/v1/usuarios/alunos", json=NOVO_ALUNO, headers=cabecalho(professor)
     )
     assert resposta.status_code == 201
-    corpo = resposta.json()
+    corpo = resposta.json()["dados"]
     assert corpo["nome_completo"] == "João da Silva"
     assert corpo["email"] == "joao@exemplo.com"
     assert corpo["tipo"] == "aluno"
@@ -24,18 +24,18 @@ def test_professor_cadastra_aluno_e_aluno_define_a_senha(
 
     # Sem senha definida, o aluno ainda não consegue entrar.
     login = {"email": "joao@exemplo.com", "senha": "Senha-Do-Joao-1"}
-    assert client.post("/auth/login", json=login).status_code == 401
+    assert client.post("/v1/auth/login", json=login).status_code == 401
 
     # O código do convite serve direto no passo de validação do primeiro acesso.
     resposta = client.post(
-        "/auth/primeiro-acesso/validar-codigo",
+        "/v1/auth/primeiro-acesso/validar-codigo",
         json={"email": "joao@exemplo.com", "codigo": enviador.ultimo_codigo()},
     )
     assert resposta.status_code == 200
-    token = resposta.json()["token_primeiro_acesso"]
+    token = resposta.json()["dados"]["token_primeiro_acesso"]
 
     resposta = client.post(
-        "/auth/primeiro-acesso/aluno",
+        "/v1/auth/primeiro-acesso/aluno",
         json={
             "data_nascimento": nascido_ha(20).isoformat(),
             "cpf": "529.982.247-25",
@@ -45,23 +45,23 @@ def test_professor_cadastra_aluno_e_aluno_define_a_senha(
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resposta.status_code == 200
-    assert client.post("/auth/login", json=login).status_code == 200
+    assert client.post("/v1/auth/login", json=login).status_code == 200
 
 
 def test_aluno_nao_pode_cadastrar_aluno(client, aluno):
     resposta = client.post(
-        "/usuarios/alunos", json=NOVO_ALUNO, headers=cabecalho(aluno)
+        "/v1/usuarios/alunos", json=NOVO_ALUNO, headers=cabecalho(aluno)
     )
     assert resposta.status_code == 403
 
 
 def test_cadastro_exige_autenticacao(client):
-    assert client.post("/usuarios/alunos", json=NOVO_ALUNO).status_code == 401
+    assert client.post("/v1/usuarios/alunos", json=NOVO_ALUNO).status_code == 401
 
 
 def test_email_duplicado(client, professor, aluno):
     resposta = client.post(
-        "/usuarios/alunos",
+        "/v1/usuarios/alunos",
         json={"nome_completo": "Outro Aluno", "email": aluno.email.upper()},
         headers=cabecalho(professor),
     )
@@ -70,7 +70,7 @@ def test_email_duplicado(client, professor, aluno):
 
 def test_front_nao_escolhe_o_tipo(client, professor):
     resposta = client.post(
-        "/usuarios/alunos",
+        "/v1/usuarios/alunos",
         json={**NOVO_ALUNO, "tipo": "professor"},
         headers=cabecalho(professor),
     )
@@ -80,13 +80,13 @@ def test_front_nao_escolhe_o_tipo(client, professor):
 def test_falha_no_email_desfaz_o_cadastro(client, professor, enviador, sessao):
     enviador.falhar = True
     resposta = client.post(
-        "/usuarios/alunos", json=NOVO_ALUNO, headers=cabecalho(professor)
+        "/v1/usuarios/alunos", json=NOVO_ALUNO, headers=cabecalho(professor)
     )
     assert resposta.status_code == 502
     assert sessao.query(Usuario).filter_by(email="joao@exemplo.com").first() is None
 
     enviador.falhar = False
     resposta = client.post(
-        "/usuarios/alunos", json=NOVO_ALUNO, headers=cabecalho(professor)
+        "/v1/usuarios/alunos", json=NOVO_ALUNO, headers=cabecalho(professor)
     )
     assert resposta.status_code == 201

@@ -21,21 +21,27 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ## [Não lançado]
 
-Banco: revisão `0002` do Alembic.
+Banco: revisão `0003` do Alembic.
 
 ### Adicionado
 
-- Autenticação por e-mail e senha em `POST /auth/login`, com token JWT e bloqueio temporário da conta após tentativas de login seguidas sem sucesso.
-- Sessão do usuário: `GET /auth/me`, `POST /auth/renovar` e `POST /auth/sair-de-todos`, que invalida todos os tokens já emitidos.
-- Redefinição de senha por código enviado por e-mail: `POST /auth/esqueci-senha` e `POST /auth/redefinir-senha`.
-- Primeiro acesso do aluno, separado da redefinição de senha: `POST /auth/primeiro-acesso/codigo`, `POST /auth/primeiro-acesso/validar-codigo` e `POST /auth/primeiro-acesso/aluno`.
-- Cadastro de aluno pela professora em `POST /usuarios/alunos`, com envio do e-mail de acesso.
+- Versão no caminho: todas as rotas ficam sob `/v1`. A documentação (`/docs`) e `GET /api/health` ficam fora da versão.
+- Envelope único nas respostas de `/v1`, de sucesso e de erro: `{"sucesso", "mensagem", "dados"}`, com a lista `erros` nos erros de validação (`422`). Rota inexistente, método não permitido e erro interno também respondem nesse formato.
+- Autenticação por e-mail e senha em `POST /v1/auth/login`, com token JWT e bloqueio temporário da conta após tentativas de login seguidas sem sucesso.
+- Sessão do usuário: `GET /v1/auth/me`, `POST /v1/auth/renovar` e `POST /v1/auth/sair-de-todos`, que invalida todos os tokens já emitidos.
+- Redefinição de senha por código enviado por e-mail: `POST /v1/auth/esqueci-senha` e `POST /v1/auth/redefinir-senha`.
+- Primeiro acesso do aluno, separado da redefinição de senha: `POST /v1/auth/primeiro-acesso/codigo`, `POST /v1/auth/primeiro-acesso/validar-codigo` e `POST /v1/auth/primeiro-acesso/aluno`.
+- Cadastro de aluno pela professora em `POST /v1/usuarios/alunos`, com envio do e-mail de acesso.
+- Listagem de alunos para a professora em `GET /v1/usuarios/alunos`, paginada e com busca por nome ou e-mail que ignora maiúsculas e acentos. Mostra só quem concluiu o primeiro acesso.
+- Detalhe do aluno em `GET /v1/usuarios/alunos/{id}`, com os dados do perfil e do responsável. Os campos `aulas` e `pagamentos` já existem na resposta, ainda sempre vazios.
+- Perfil do próprio aluno em `GET /v1/auth/me/perfil` e edição em `PATCH /v1/auth/me/perfil`: nome, telefone e dados do responsável. E-mail, CPF do aluno e data de nascimento não são editáveis.
 - Modelos e migrações de `usuario`, `codigo_verificacao` (`0001`) e `aluno` (`0002`), com campos de auditoria e soft delete.
+- Migração `0003`, que habilita a extensão `unaccent` do PostgreSQL, usada na busca de alunos.
 - Envio de e-mail com backend `console` (apenas loga) ou `smtp`.
 - Script de criação da conta da professora: `python -m src.scripts.criar_professor`.
 - Script `aplicar_migracoes.sh`, para aplicar as migrações em produção ou homologação.
 - Observabilidade com o Logfire, ligada pela variável `LOGFIRE_TOKEN`: requisições, consultas SQL, exceções e logs, sem enviar os dados recebidos nas rotas.
-- Testes automatizados de autenticação, primeiro acesso, usuários e schemas.
+- Testes automatizados de autenticação, primeiro acesso, usuários, alunos, perfil e schemas.
 - Documentação: guia de migrações com Alembic, variáveis de ambiente e comandos úteis.
 
 ### Alterado
