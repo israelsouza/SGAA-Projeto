@@ -7,7 +7,7 @@
 
 ## Regras de trabalho
 
-Comandos executados dentro de `api/`.
+Comandos executados dentro de `api/`. 
 
 1. Antes de executar uma tarefa, rodar os linters e os testes automatizados, e rodar de novo ao concluir:
    - `poetry run ruff check .`
